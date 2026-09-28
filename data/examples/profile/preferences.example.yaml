@@ -1,0 +1,4 @@
+minimum_experience_bullets: 3
+# Optional: use either detailed_positions or ending_before, not both.
+# earlier_experience:
+#   detailed_positions: 4

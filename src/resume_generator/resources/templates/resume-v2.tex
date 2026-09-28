@@ -1,0 +1,124 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage{iftex}
+\ifPDFTeX
+\PackageError{resume-generator}{Resume PDF rendering requires xelatex}{Install xelatex and rerun rendering}
+\else
+{% include 'font_setup.tex' %}
+\fi
+\usepackage{microtype}
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{needspace}
+\geometry{margin=0.85in}
+\titleformat{\section}{\large\bfseries}{}{0em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+\setlist[itemize]{noitemsep, topsep=0pt, leftmargin=1.25em}
+\setlength{\parindent}{0pt}
+\newcommand{\ResumeSectionTopGap}{0.2em}
+\newcommand{\ResumeCompanyToRoleGap}{0.06em}
+\newcommand{\ResumeRoleToBulletsGap}{-0.05em}
+\newcommand{\ResumeBulletsToSkillsGap}{0.55em}
+\newcommand{\ResumeRoleBlockGap}{0.7em}
+\newcommand{\ResumeCompanyBlockGap}{0.85em}
+\newcommand{\ResumeCompanyLine}[1]{{\normalsize \textbf{#1}}\\}
+\newcommand{\ResumeRoleLine}[2]{{\small \noindent\textbf{#1} \hfill {\normalfont #2}}\\}
+\newcommand{\ResumeSkillsLine}[1]{{\small \textit{Skills: #1}}}
+\begin{document}
+\sloppy
+\begin{center}
+    {\LARGE \textbf{ << name >> }}\\
+    << headline >> \\
+    \vspace{0.3em}
+    << location >> ~|~
+    Phone: << phone >> ~|~
+    Email: \href{mailto:<< email >>}{<< email >>} \\
+    << links >>
+\end{center}
+
+\section*{Summary}
+<< summary >>
+
+{% if skill_groups %}
+\section*{Skills \& Core Competencies}
+{\small
+\begin{itemize}
+{% for skill in skill_groups %}
+    \item \textbf{ << skill.category >> }: << skill.keywords >>
+{% endfor %}
+\end{itemize}
+}
+{% endif %}
+
+{% if experience %}
+\section*{Experience}
+\vspace{\ResumeSectionTopGap}
+{% for company in experience %}
+\Needspace{10\baselineskip}
+\ResumeCompanyLine{ << company.company >>{% if company.location %} — << company.location >>{% endif %} }
+\nopagebreak[4]
+\vspace{\ResumeCompanyToRoleGap}
+{% for role in company.roles %}
+\Needspace{6\baselineskip}
+\nopagebreak[4]
+\ResumeRoleLine{ << role.position >> }{ << role.start_date >> -- << role.end_date or 'Present' >> }
+\vspace{\ResumeRoleToBulletsGap}
+{% if role.bullets %}
+\begin{itemize}
+{% for bullet in role.bullets %}
+    \item << bullet.text >>
+{% endfor %}
+\end{itemize}
+{% endif %}
+{% if role.tech_stack %}
+\vspace{\ResumeBulletsToSkillsGap}
+\ResumeSkillsLine{ << role.tech_stack | join(', ') >> }
+{% endif %}
+{% if not loop.last %}\vspace{\ResumeRoleBlockGap}{% endif %}
+{% endfor %}
+{% if not loop.last %}\vspace{\ResumeCompanyBlockGap}{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if earlier_experience %}
+\Needspace{10\baselineskip}
+\section*{Earlier Experience}
+\vspace{\ResumeSectionTopGap}
+\ResumeRoleLine{ << earlier_experience.position >> }{ << earlier_experience.start_date >> -- << earlier_experience.end_date >> }
+{% if earlier_experience.bullets %}
+\begin{itemize}
+{% for bullet in earlier_experience.bullets %}
+    \item << bullet.text >>
+{% endfor %}
+\end{itemize}
+{% endif %}
+{% if earlier_experience.tech_stack %}
+\ResumeSkillsLine{ << earlier_experience.tech_stack | join(', ') >> }
+{% endif %}
+{% endif %}
+
+{% if education %}
+\Needspace{10\baselineskip}
+\section*{Education}
+{% for item in education %}
+\Needspace{6\baselineskip}
+\subsection*{ << item.institution >> }
+{% if item.degree_line %}\textbf{ << item.degree_line >> }{% endif %}{% if item.start_date or item.end_date %}\hfill << item.start_date or '' >> -- << item.end_date or '' >>\\{% else %}\\{% endif %}
+{% if item.details %}\begin{itemize}
+{% for detail in item.details %}    \item << detail >>
+{% endfor %}\end{itemize}
+{% endif %}
+\vspace{1em}
+{% endfor %}
+{% endif %}
+
+{% if languages %}
+\section*{Languages}
+\begin{itemize}
+{% for language in languages %}
+    \item << language.language >> (<< language.level >>)
+{% endfor %}
+\end{itemize}
+{% endif %}
+\end{document}

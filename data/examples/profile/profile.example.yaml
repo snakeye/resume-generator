@@ -1,0 +1,60 @@
+schema_version: 1
+
+basics:
+  name: Alex Example
+  email: alex@example.com
+  phone: "+49 000 000000"
+  location: Berlin, Germany
+  links:
+    - label: LinkedIn
+      url: https://www.linkedin.com/in/alex-example
+
+work:
+  - company: Example Labs GmbH
+    position: Senior Software Engineer
+    location: Berlin, Germany
+    start_date: 2021-04
+    end_date: null
+    skills: [Python, PostgreSQL, Technical Leadership, System Design]
+    facts:
+      - Reduced API response time by 35% by profiling critical paths and redesigning database access.
+      - Led technical planning for a team of five engineers while continuing hands-on delivery.
+
+  - company: Sample Cloud AG
+    position: Software Engineer
+    location: Hamburg, Germany
+    start_date: 2018-02
+    end_date: 2021-03
+    skills: [Python, Kafka, AWS]
+    facts:
+      - Built and operated event-driven services processing more than one million messages per day.
+
+education:
+  - institution: Example Technical University
+    area: Computer Science
+    study_type: Bachelor of Science
+    start_date: 2014
+    end_date: 2018
+    details:
+      - Completed coursework and a capstone project in distributed systems.
+
+skills:
+  - Python
+  - PostgreSQL
+  - Kafka
+  - AWS
+  - System Design
+
+skill_groups:
+  - name: Leadership & Delivery
+    keywords: [Technical Leadership]
+  - name: Architecture & Backend
+    keywords: [Python, PostgreSQL, System Design]
+  - name: Platform, Data & Reliability
+    keywords: [Kafka, AWS]
+
+languages:
+  - language: English
+    level: C1
+  - language: German
+    level: B2

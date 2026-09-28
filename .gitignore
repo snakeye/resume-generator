@@ -1,0 +1,23 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+# Real candidate data is local unless explicitly opted into private Git storage.
+data/profile/*
+!data/profile/README.md
+
+# Local execution data must never be committed.
+data/runs/
+data/cache/
+data/logs/
+data/.runner.lock
+
+# LaTeX temporary files outside managed run directories.
+*.aux
+*.log
+*.out
+*.synctex.gz

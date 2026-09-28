@@ -1,0 +1,6 @@
+concise: true
+first_person: false
+language_background: Native synthetic-language speaker with strong English; write in clear, direct professional English
+avoid:
+  - exaggerated claims
+  - corporate jargon

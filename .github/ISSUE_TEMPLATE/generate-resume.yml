@@ -1,0 +1,63 @@
+name: Generate resume
+description: Generate a tailored resume for a vacancy
+title: "[Resume] "
+labels:
+  - "resume:ready"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Paste the vacancy exactly as published. Vacancy text and additional
+        instructions cannot add experience that is absent from your profile.
+
+  - type: input
+    id: company
+    attributes:
+      label: Company
+      placeholder: Example GmbH
+    validations:
+      required: true
+
+  - type: input
+    id: position
+    attributes:
+      label: Position
+      placeholder: Senior Software Engineer
+    validations:
+      required: true
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Resume language
+      options:
+        - English
+    validations:
+      required: true
+
+  - type: textarea
+    id: job-description
+    attributes:
+      label: Job description
+      description: Paste the complete vacancy text.
+    validations:
+      required: true
+
+  - type: textarea
+    id: instructions
+    attributes:
+      label: Additional preferences
+      description: Optional preferences such as emphasis, length, or tone.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: form-version
+    attributes:
+      label: Form version
+      description: Do not change this value.
+      options:
+        - "1"
+      default: 0
+    validations:
+      required: true

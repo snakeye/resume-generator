@@ -1,0 +1,31 @@
+[project]
+name = "resume-generator"
+version = "0.1.0"
+description = "Generate evidence-based resumes from GitHub Issues"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "PyYAML>=6.0",
+    "pydantic>=2.0,<3.0",
+    "pydantic-settings>=2.0,<3.0",
+    "python-dotenv>=1.0,<2.0",
+    "Jinja2>=3.1,<4.0",
+    "python-docx>=1.1,<2.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.11"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RET", "C90"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

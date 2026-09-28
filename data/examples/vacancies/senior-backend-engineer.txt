@@ -1,0 +1,24 @@
+Senior Backend Engineer
+Example Commerce GmbH
+Berlin, Germany
+
+We are looking for a senior backend engineer to design and operate reliable
+services for our commerce platform.
+
+Responsibilities:
+
+- Design Python services and PostgreSQL data models.
+- Improve API performance and production reliability.
+- Collaborate on system design and technical planning.
+- Support event-driven workloads using Kafka.
+
+Required experience:
+
+- Professional Python and PostgreSQL experience.
+- Experience designing and operating production backend systems.
+- Clear written and verbal English communication.
+
+Nice to have:
+
+- AWS experience.
+- Technical leadership in a small engineering team.

@@ -1,0 +1,1 @@
+"""Local resume generation application."""

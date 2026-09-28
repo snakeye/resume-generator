@@ -1,0 +1,320 @@
+---
+mongodb:
+- mongo db
+- mongo
+golang:
+- go lang
+ruby on rails:
+- rails
+- ror
+typescript:
+- ts
+javascript:
+- js
+- ecmascript
+node.js:
+- nodejs
+dotnet:
+- ".net"
+- asp.net
+- aspnet
+- net framework
+- ".net framework"
+postgresql:
+- postgres
+- postgre
+- psql
+kubernetes:
+- k8s
+- kube
+- container orchestration
+gcp:
+- google cloud
+- google cloud platform
+- cloud-infrastruktur (gcp)
+- interne gcp-lösungen
+aws:
+- amazon web services
+aws lambda:
+- lambda
+- serverless functions
+aws s3:
+- s3
+aws eks:
+- eks
+aws emr:
+- emr
+aws bedrock:
+- bedrock
+aws cognito:
+- cognito
+aws dynamodb:
+- dynamodb
+aws iam:
+- iam
+ci/cd:
+- cicd
+- continuous integration
+- continuous delivery
+- continuous deployment
+- github ci/cd
+api design:
+- api-design
+- api development
+- api architecture
+- api lifecycle
+api integration:
+- api integrations
+- api connectivity
+rest api:
+- restful api
+- rest apis
+- restful apis
+- rest api design
+- rest services
+- restful services
+- http api
+- http apis
+- http/rest
+grpc:
+- google grpc
+testing:
+- tests
+- software testing
+test automation:
+- automated testing
+- automation testing
+unit testing:
+- unit tests
+- unit test
+integration testing:
+- integration tests
+- integration test
+code review:
+- code reviews
+- code-reviews
+asynchronous workflows:
+- async workflows
+- background jobs
+- schedulers
+- async processing
+- asynchronous communications
+resilience patterns:
+- retries
+- rate limits
+- backoff
+- timeouts
+- error handling
+- exception handling
+cloud technologies:
+- cloud technologies (gcp, aws, azure)
+- cloud infrastructure
+- cloud-native architectures
+- cloud native architectures
+python:
+- typed python
+- python 3
+- python3
+microservices:
+- micro services
+- micro-service
+- micro-services
+- microservice
+- microservice architecture
+- microservices architecture
+- microservice architectures
+message queues:
+- message queue
+- mq
+- asynchronous messaging
+- queues
+firebase:
+- google firebase
+firestore:
+- cloud firestore
+- google firestore
+rabbitmq:
+- rabbit mq
+- amqp
+agile:
+- agile methodologies
+- agile development
+debugging:
+- troubleshooting
+- diagnostics
+scrum:
+- scrum framework
+kanban:
+- canban
+- kanban board
+project management:
+- project manager
+- project coordination
+engineering management:
+- people management
+- team management
+- line management
+- team lead
+- engineering manager
+technical leadership:
+- engineering leadership
+- team leadership
+devops:
+- dev ops
+- azure devops
+mentoring:
+- mentorship
+- coach
+- coaching
+cross-functional teams:
+- cross functional teams
+- cross-functional collaboration
+- cross functional collaboration
+- cross-team collaboration
+stakeholder management:
+- stakeholder alignment
+- stakeholder communication
+- stakeholder communications
+delivery ownership:
+- delivery leadership
+- delivery management
+- delivery coordination
+software architecture:
+- softwarearchitektur
+- architecture
+documentation:
+- technical documentation
+- technische dokumentation
+apache kafka:
+- kafka
+- kafka streams
+ms sql server:
+- ms sql
+- sql server
+- mssql
+elasticsearch:
+- elastic search
+- elastic
+machine learning:
+- ml
+artificial intelligence:
+- ai
+llm-powered products:
+- llm
+- llms
+- large language models
+- large-language-models
+rag:
+- retrieval augmented generation
+- retrieval-augmented generation
+prompt and workflow design:
+- prompt engineering
+- prompt design
+vector search:
+- vector db
+- vector database
+- vector databases
+embeddings:
+- embedding
+- text embeddings
+knowledge graphs:
+- knowledge graph
+github actions:
+- gha
+terraform:
+- terraform cloud
+- tf
+- iac
+- infrastructure as code
+tailwind css:
+- tailwindcss
+- tailwind
+ai-assisted development:
+- ai-assisted coding
+- ai-assisted development tools
+- ai development tools (claude code, codex, cursor, copilot)
+- ai-assisted code review
+- ai-augmented workflows
+- ai-driven development
+- claude
+- github copilot
+- copilot
+- cursor
+- codex
+agentic coding:
+- coding agents
+- ai coding agents
+- agentic development
+backend development:
+- backend
+- backend engineering
+- backend systems
+full-stack development:
+- full stack development
+- fullstack development
+- full-stack engineering
+- full stack engineering
+- fullstack engineering
+event-driven systems:
+- event driven systems
+- event-driven architecture
+- event driven architecture
+- event-driven architectures
+- event-driven approaches
+jira:
+- jira software
+confluence:
+- atlassian confluence
+english:
+- english language
+- professional english
+- business english
+- fluent english
+- c1 english
+- b2 english
+c#:
+- csharp
+- c sharp
+c++:
+- c/c++
+react:
+- react.js
+- reactjs
+vue.js:
+- vue
+- vuejs
+nuxt.js:
+- nuxt
+- nuxtjs
+next.js:
+- next
+- nextjs
+angular:
+- angular 2+
+- angular2
+angularjs:
+- angular.js
+observability:
+- o11y
+monitoring:
+- system monitoring
+- application monitoring
+logging:
+- logs
+- log management
+tracing:
+- distributed tracing
+grafana:
+- grafana dashboards
+prometheus:
+- prom
+redis:
+- redis cache
+oauth:
+- oauth2
+- oauth 2.0
+jwt:
+- json web token
+- json web tokens
+incident response:
+- incident management
