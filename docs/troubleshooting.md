@@ -1,8 +1,8 @@
 # Troubleshooting
 
 > [!NOTE]
-> `setup` and `doctor` cover onboarding diagnostics. Resume generation is still
-> being delivered; see [`roadmap.md`](roadmap.md).
+> `setup`, `doctor`, and resume generation are implemented. The roadmap tracks
+> release follow-up work rather than missing core commands.
 
 Start with:
 

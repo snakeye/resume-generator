@@ -42,10 +42,9 @@ GitHub Issue -> local runner -> validated resume -> Pull Request
 
 6. Create a **Generate resume** issue and wait for the generated Pull Request.
 
-The setup command will guide GitHub authentication when needed, create labels,
-detect the repository and default branch, configure DeepSeek, prepare the
-profile, and verify the PDF toolchain. `./resume doctor` is available when
-diagnostics are needed but is not a required setup step.
+The setup command checks GitHub authentication, creates labels, detects the
+repository and default branch, configures DeepSeek, prepares the profile, and
+checks the local PDF toolchain. Use `./resume doctor` for diagnostics.
 
 ## Requirements
 

@@ -29,7 +29,8 @@ Install:
 - [GitHub CLI](https://cli.github.com/);
 - [uv](https://docs.astral.sh/uv/).
 
-Setup checks GitHub CLI authentication and starts `gh auth login` when needed.
+Setup checks GitHub CLI authentication. If authentication is missing, run
+`gh auth login` and rerun setup.
 
 ## 4. Run Setup
 
@@ -42,13 +43,10 @@ Setup will:
 - verify that the repository is private;
 - detect the GitHub owner, repository, and default branch;
 - check GitHub authentication;
-- verify the local Python and PDF toolchain;
+- check the local PDF toolchain;
 - request the DeepSeek API key and create `.env`;
-- validate provider settings from `.env` without exposing the API key;
 - create the four files under `data/profile/` from the synthetic examples;
 - create the required GitHub labels;
-- check the Issue Form and PDF toolchain;
-- run a local smoke test.
 
 Setup is idempotent. Running it again must not overwrite the profile or
 secrets.
