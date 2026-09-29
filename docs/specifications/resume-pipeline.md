@@ -830,7 +830,7 @@ order, сохраняет display source и canonical term и группируе
     "idioms": "rare",
     "marketing_language": "avoid"
   },
-  "language_background": "Use clear, direct professional English with rare idioms",
+  "language_background": "Native Russian speaker with strong English; write in clear professional English with a natural Russian-influenced rhythm and occasional slightly literal phrasing",
   "avoid": [
     "spearheaded",
     "championed",
@@ -845,10 +845,10 @@ career fact and must not be mentioned in generated resume text. It may preserve
 a natural non-native rhythm and slightly literal phrasing, but cannot justify
 intentional language errors or stereotypes.
 
-Language background may help build an initial voice profile, but must not be used as a caricatured prompt such as:
+Языковой background может помогать построить initial voice profile, но не должен использоваться как карикатурный prompt вроде:
 
 ```text
-Write like a specific person.
+Write like a Russian.
 ```
 
 Цель:
@@ -939,9 +939,16 @@ Validation происходит на нескольких уровнях.
 * числа;
 * технологии;
 * местоположения;
-* контакты.
+* контакты;
+* образование и языки;
+* написанные словами количества;
+* технологии, встречающиеся только в generated text;
+* повышение seniority, ownership или scope ответственности;
+* присвоение командного результата одному человеку.
 
-Отдельный LLM-validator проверяет semantic drift:
+Проверка semantic drift выполняется до rendering на assembled `ResumeDocument`.
+Она использует provenance каждого claim и supporting profile evidence и
+проверяет, что generated text не усиливает смысл исходного факта:
 
 ```text
 worked with -> led
@@ -949,7 +956,8 @@ participated -> owned
 helped migrate -> led migration
 ```
 
-Validator только диагностирует.
+Validation report для каждого blocking issue сохраняет stage, claim, provenance
+path и supporting evidence. Validator только диагностирует.
 
 Он ничего не исправляет самостоятельно.
 
@@ -1004,7 +1012,6 @@ PDF -> extracted text
 * bullets;
 * символы;
 * ссылки;
-* количество страниц;
 * переполнение layout.
 
 LaTeX сам по себе не является гарантией ATS compatibility.
@@ -1015,8 +1022,8 @@ LaTeX сам по себе не является гарантией ATS compatib
 перенесённый и versioned Jinja2 template `resume-v2.tex` вместе с локальным
 `font_setup.tex`, экранирует пользовательские значения и вызывает
 `xelatex` через отдельную compiler boundary. Извлечение текста выполняется
-через `pdftotext`, а количество страниц проверяется через `pdfinfo`. Compiler и
-extractor заменяются fake-реализациями в обычных тестах; реальный compile smoke
+через `pdftotext`. Compiler и extractor заменяются fake-реализациями в обычных
+тестах; реальный compile smoke
 test является локальным opt-in и не запускается в CI.
 
 ---
@@ -1051,9 +1058,11 @@ Core principle:
 
 Первая реализация validation stage находится в `validation.py`. Она возвращает
 версионированный report с `warning` и `error`, проверяет immutable profile fields,
-provenance, числа в claims, повторяющиеся начала bullets и обязательные
-требования вакансии. Report не изменяет `ResumeDocument`; ошибки должны быть
-исправлены повторным запуском generation stage.
+provenance, числа и quantities в claims, technologies, semantic drift,
+повторяющиеся начала bullets и обязательные требования вакансии. Report не
+изменяет `ResumeDocument`; ошибки должны быть исправлены повторным запуском
+generation stage. Финальный assembled `resume.json` проходит эту проверку до
+копирования в publishable output directory.
 
 ---
 
@@ -1452,6 +1461,13 @@ timestamp
 git commit, если доступен
 ```
 
+В publishable `run-metadata.json` issue, input, profile и provider
+configuration представлены SHA-256 хешами канонического JSON. Prompt files и
+их bundle также представлены хешами. Metadata содержит версии issue form,
+profile, stage artifact и request contract, а также версии Python и
+установленных runtime-пакетов. Исходные issue, profile, configuration,
+prompts, credentials и provider responses в этот файл не записываются.
+
 LLM stochastic output не гарантирует побайтово идентичный текст.
 
 Проект обещает воспроизводимость логики, контрактов, ограничений и audit trail.
@@ -1502,7 +1518,6 @@ data/profile/
 
 ```yaml
 # data/profile/preferences.yaml
-maximum_pages: 2
 minimum_experience_bullets: 3
 ```
 
@@ -1533,7 +1548,7 @@ postgresql: [postgres, postgre, psql]
 # 33. Language и locale
 
 Язык vacancy не определяет язык CV. Язык из Issue Form задаётся явно для
-каждого запроса. В English-only MVP поддерживается одно значение с фиксированным locale:
+каждого запроса. В MVP поддерживается только English с фиксированным locale:
 
 ```text
 English -> en-GB

@@ -62,6 +62,12 @@ data/output/2026-01-01/142-example-gmbh-senior-software-engineer/
 
 Publishing uses an exact file allowlist. It never uses `git add .`.
 
+Published `run-metadata.json` contains only sanitized reproducibility data:
+canonical JSON hashes for issue, input, profile, and provider configuration;
+prompt file and bundle hashes; contract and schema versions; provider/model;
+and toolchain versions. It never contains the source values represented by
+those hashes.
+
 ## Application Resources
 
 Prompts and resume templates are versioned application code:

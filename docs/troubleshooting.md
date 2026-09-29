@@ -1,8 +1,8 @@
 # Troubleshooting
 
 > [!NOTE]
-> `setup`, `doctor`, and resume generation are implemented. The roadmap tracks
-> release follow-up work rather than missing core commands.
+> `setup`, `doctor`, the generation pipeline, and Pull Request publishing are
+> implemented. See [`roadmap.md`](roadmap.md) for the remaining release work.
 
 Start with:
 
@@ -14,7 +14,8 @@ The command should identify the first blocking problem and print the exact
 recovery command.
 
 `doctor` checks local tools, GitHub authentication and repository visibility,
-then reports whether the profile and `.env` exist. It does not modify files.
+then reports whether the profile and `.env` exist. It also reports insecure
+`.env` permissions; fix them with `chmod 600 .env`. It does not modify files.
 
 ## GitHub Authentication Is Missing
 

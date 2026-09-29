@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -90,7 +91,7 @@ class PipelineResult(BaseModel):
     error: str | None = None
 
 
-def create_run(root: Path, run_id: str) -> RunContext:
+def create_run(root: Path, run_id: str, *, metadata: Mapping[str, Any] | None = None) -> RunContext:
     """Create an empty run directory and its inspectable subdirectories."""
     if not _RUN_ID_RE.fullmatch(run_id):
         raise PipelineError("run_id must contain only letters, numbers, '.', '_' or '-'.")
@@ -107,7 +108,7 @@ def create_run(root: Path, run_id: str) -> RunContext:
     except OSError as error:
         raise PipelineError(f"Cannot create run directory {context.run_dir}: {error}") from error
 
-    metadata = {
+    run_metadata = {
         "schema_version": 1,
         "run_id": run_id,
         "run_date": run_date,
@@ -116,8 +117,10 @@ def create_run(root: Path, run_id: str) -> RunContext:
         "input_sha256": None,
         "git_commit": _git_commit(root),
     }
+    if metadata:
+        run_metadata.update(metadata)
     try:
-        _atomic_write(context.run_dir / "run-metadata.json", _json_text(metadata))
+        _atomic_write(context.run_dir / "run-metadata.json", _json_text(run_metadata))
     except OSError as error:
         raise PipelineError(f"Cannot write run metadata: {error}") from error
     return context
@@ -131,9 +134,10 @@ def run_pipeline(
     stages: Mapping[str, Any],
     on_run_created: Any | None = None,
     on_stage: StageProgress | None = None,
+    metadata: Mapping[str, Any] | None = None,
 ) -> PipelineResult:
     """Run supplied stages in the documented order and persist each result."""
-    context = create_run(root, run_id)
+    context = create_run(root, run_id, metadata=metadata)
     try:
         if on_run_created is not None:
             on_run_created(context)
@@ -236,21 +240,26 @@ def _write_input(context: RunContext, request: ResumeRequest) -> str:
 
 
 def _update_metadata(context: RunContext, *, input_hash: str, completed_stages: list[str]) -> None:
-    metadata = {
-        "schema_version": 1,
-        "run_id": context.run_id,
-        "created_at": json.loads((context.run_dir / "run-metadata.json").read_text(encoding="utf-8"))["created_at"],
-        "completed_stages": completed_stages,
-        "input_sha256": input_hash,
-        "git_commit": _git_commit(context.root),
-    }
+    metadata = json.loads((context.run_dir / "run-metadata.json").read_text(encoding="utf-8"))
+    metadata.update(
+        {
+            "schema_version": 1,
+            "run_id": context.run_id,
+            "completed_stages": completed_stages,
+            "input_sha256": input_hash,
+            "git_commit": _git_commit(context.root),
+        }
+    )
     _atomic_write(context.run_dir / "run-metadata.json", _json_text(metadata))
 
 
 def _sha256(value: str) -> str:
-    import hashlib
-
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def sha256_json(value: Any) -> str:
+    """Hash canonical JSON without exposing the value in metadata."""
+    return _sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
 
 
 def _monotonic() -> float:

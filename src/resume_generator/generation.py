@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
+import platform
 import re
 import shutil
 import unicodedata
 from collections.abc import Callable
 from datetime import UTC, datetime
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -16,10 +19,19 @@ from .bullets import generate_bullets
 from .evidence import calculate_coverage, match_evidence, match_profile_evidence
 from .headline import generate_headline
 from .issue import ResumeTask
-from .pipeline import PipelineResult, ResumeRequest, RunContext, StageProgress, run_pipeline
+from .pipeline import PipelineResult, ResumeRequest, RunContext, StageProgress, run_pipeline, sha256_json
 from .profile import load_profile
 from .provider import LLMProvider
-from .rendering import Compiler, PdfExtractor, render_docx, render_markdown, render_resume, validate_docx, validate_pdf
+from .rendering import (
+    Compiler,
+    PdfExtractor,
+    expected_rendered_text,
+    render_docx,
+    render_markdown,
+    render_resume,
+    validate_docx,
+    validate_pdf,
+)
 from .selection import select_facts
 from .skills import select_skills
 from .summary import generate_summary
@@ -76,6 +88,7 @@ class ResumePipeline:
             job_description=task.job_description,
             additional_instructions=task.additional_instructions,
         )
+        metadata = _reproducibility_metadata(profile, task, self.provider)
         result = run_pipeline(
             request,
             root=self.root,
@@ -83,6 +96,7 @@ class ResumePipeline:
             stages=stages,
             on_run_created=lambda context: _configure_debug_directory(self.provider, context.debug_dir),
             on_stage=self.on_stage,
+            metadata=metadata,
         )
         if not result.success:
             return result
@@ -213,14 +227,13 @@ def _run_pdf_validation(
     extractor: PdfExtractor | None,
 ) -> dict[str, Any]:
     resume = state["resume"]
-    expected = [resume.basics.name, *(company.company for company in resume.experience)]
-    if resume.earlier_experience is not None:
-        expected.append("Earlier Experience")
-    issues = pdf_validator(state["pdf_path"], expected, extractor=extractor)
+    pdf_expected = expected_rendered_text(resume, skills_heading="Skills & Core Competencies")
+    issues = pdf_validator(state["pdf_path"], pdf_expected, extractor=extractor)
     if issues:
         raise GenerationError("PDF validation failed: " + "; ".join(issues))
     if "docx_path" in state:
-        docx_issues = validate_docx(state["docx_path"], expected)
+        docx_expected = expected_rendered_text(resume, skills_heading="Skills")
+        docx_issues = validate_docx(state["docx_path"], docx_expected)
         if docx_issues:
             raise GenerationError("DOCX validation failed: " + "; ".join(docx_issues))
     return {"valid": True, "issues": []}
@@ -563,6 +576,57 @@ def _provider_metadata(state: dict[str, Any]) -> dict[str, str]:
     if provider is None:
         return {}
     return {key: str(getattr(provider, key)) for key in ("provider_name", "model") if hasattr(provider, key)}
+
+
+def _reproducibility_metadata(profile: Any, task: ResumeTask, provider: LLMProvider) -> dict[str, Any]:
+    provider_config = _provider_configuration(provider)
+    prompt_versions = _prompt_versions()
+    return {
+        "issue_sha256": sha256_json(task.model_dump(mode="json")),
+        "profile_sha256": sha256_json(profile.model_dump(mode="json")),
+        "configuration_sha256": sha256_json(provider_config),
+        "prompt_sha256": prompt_versions["bundle_sha256"],
+        "prompt_versions": prompt_versions["files"],
+        "schema_versions": {
+            "issue_form": task.form_version,
+            "profile": profile.schema_version,
+            "stage_artifact": 1,
+        },
+        "contract_versions": {"resume_request": 1},
+        "provider": _provider_metadata({"provider": provider}),
+        "toolchain_versions": _toolchain_versions(),
+    }
+
+
+def _provider_configuration(provider: LLMProvider) -> dict[str, str]:
+    keys = ("provider_name", "model", "endpoint", "timeout", "retries")
+    return {key: str(getattr(provider, key)) for key in keys if hasattr(provider, key)}
+
+
+def _prompt_versions() -> dict[str, Any]:
+    root = resources.files("resume_generator.resources").joinpath("prompts")
+    files: dict[str, str] = {}
+
+    def collect(directory: Any, prefix: str = "") -> None:
+        for entry in sorted(directory.iterdir(), key=lambda item: item.name):
+            relative = f"{prefix}/{entry.name}" if prefix else entry.name
+            if entry.is_dir():
+                collect(entry, relative)
+            elif entry.is_file() and entry.name.endswith(".md"):
+                files[relative] = sha256_json(entry.read_text(encoding="utf-8"))
+
+    collect(root)
+    return {"bundle_sha256": sha256_json(files), "files": files}
+
+
+def _toolchain_versions() -> dict[str, str]:
+    versions = {"python": platform.python_version()}
+    for distribution in ("resume-generator", "pydantic", "pydantic-settings", "Jinja2", "python-docx", "PyYAML"):
+        try:
+            versions[distribution] = importlib.metadata.version(distribution)
+        except importlib.metadata.PackageNotFoundError:
+            continue
+    return versions
 
 
 def _configure_debug_directory(provider: LLMProvider, directory: Path) -> None:

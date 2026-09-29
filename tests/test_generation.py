@@ -1,3 +1,5 @@
+import json
+import re
 import shutil
 from pathlib import Path
 from types import SimpleNamespace
@@ -6,6 +8,7 @@ from resume_generator.generation import ResumePipeline, _report, _run_pdf_valida
 from resume_generator.issue import ResumeTask
 from resume_generator.profile import load_profile
 from resume_generator.provider import LLMResponse, LLMUsage
+from resume_generator.rendering import validate_pdf
 
 
 class SequenceProvider:
@@ -90,7 +93,51 @@ def test_pipeline_writes_publishable_artifacts_from_synthetic_stages(tmp_path):
         root=tmp_path,
         provider=provider,
         compiler=fake_compiler,
-        pdf_validator=lambda _path, _expected, **_kwargs: (),
+        pdf_validator=validate_pdf,
+        pdf_extractor=lambda _path: " ".join(
+            (
+                "Alex Example",
+                "Senior Backend Engineer",
+                "Improves reliable backend systems.",
+                "Summary",
+                "Skills & Core Competencies",
+                "Architecture & Backend",
+                "Python",
+                "PostgreSQL",
+                "System Design",
+                "Technical Leadership",
+                "Kafka",
+                "AWS",
+                "Alex Example",
+                "alex@example.com",
+                "+49 000 000000",
+                "Berlin, Germany",
+                "LinkedIn",
+                "https://www.linkedin.com/in/alex-example",
+                "Experience",
+                "Example Labs GmbH",
+                "Senior Software Engineer",
+                "2021-04",
+                "Present",
+                "Reduced API response time by 35%.",
+                "Led technical planning for five engineers.",
+                "Python",
+                "Sample Cloud AG",
+                "Software Engineer",
+                "2018-02",
+                "2021-03",
+                "Built event-driven services.",
+                "Education",
+                "Example Technical University",
+                "Bachelor of Science in Computer Science",
+                "Completed coursework and a capstone project in distributed systems.",
+                "Languages",
+                "English",
+                "C1",
+                "German",
+                "B2",
+            )
+        ),
     )
     task = ResumeTask(
         form_version=1,
@@ -121,6 +168,15 @@ def test_pipeline_writes_publishable_artifacts_from_synthetic_stages(tmp_path):
     metadata = (output / "run-metadata.json").read_text()
     assert '"issue_number": 42' in metadata
     assert "synthetic issue body" not in metadata
+    metadata_value = json.loads(metadata)
+    for field in ("issue_sha256", "profile_sha256", "configuration_sha256", "prompt_sha256"):
+        assert re.fullmatch(r"[0-9a-f]{64}", metadata_value[field])
+    assert metadata_value["schema_versions"] == {"issue_form": 1, "profile": 1, "stage_artifact": 1}
+    assert metadata_value["contract_versions"] == {"resume_request": 1}
+    assert metadata_value["provider"] == {"provider_name": "synthetic", "model": "synthetic-model"}
+    assert metadata_value["prompt_versions"]
+    assert "Example GmbH" not in metadata
+    assert "Build reliable systems." not in metadata
 
     report_text = report.read_text()
     assert report_text.startswith("# Profile gap report")
@@ -213,9 +269,23 @@ def test_pdf_validation_expects_aggregated_earlier_section_not_hidden_companies(
         return ()
 
     resume = SimpleNamespace(
-        basics=SimpleNamespace(name="Alex Example"),
-        experience=(SimpleNamespace(company="Current Company"),),
-        earlier_experience=SimpleNamespace(),
+        basics=SimpleNamespace(name="Alex Example", email="", phone="", location="", links=()),
+        headline=SimpleNamespace(text="Engineer"),
+        summary=SimpleNamespace(text="Summary text"),
+        experience=(
+            SimpleNamespace(
+                company="Current Company",
+                roles=(
+                    SimpleNamespace(position="Engineer", start_date="2020", end_date=None, bullets=(), tech_stack=()),
+                ),
+            ),
+        ),
+        skills=SimpleNamespace(skills=()),
+        earlier_experience=SimpleNamespace(
+            position="Earlier", start_date="2010", end_date="2019", bullets=(), tech_stack=()
+        ),
+        education=(),
+        languages=(),
     )
 
     result = _run_pdf_validation(
@@ -225,4 +295,18 @@ def test_pdf_validation_expects_aggregated_earlier_section_not_hidden_companies(
     )
 
     assert result == {"valid": True, "issues": []}
-    assert captured == ["Alex Example", "Current Company", "Earlier Experience"]
+    assert captured == [
+        "Alex Example",
+        "Engineer",
+        "Summary text",
+        "Summary",
+        "Experience",
+        "Current Company",
+        "Engineer",
+        "2020",
+        "Present",
+        "Earlier Experience",
+        "Earlier",
+        "2010",
+        "2019",
+    ]

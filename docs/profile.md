@@ -91,8 +91,10 @@ facts, all available facts are used and no content is invented. Vacancy-matched
 facts are preferred; unmatched facts selected to complete the work history do
 not count as vacancy coverage.
 
-Page limits are not configured in the profile yet; renderer page-count
-validation remains a release task.
+Resume length is controlled by the amount of experience included in the profile:
+use `detailed_positions` to keep only a selected number of newest positions
+detailed, or `ending_before` to group positions older than a date. The renderer
+does not impose a page limit.
 
 Education entries may include a `details` list for factual descriptions of
 coursework, thesis work, research, or postgraduate study:
@@ -123,7 +125,7 @@ title, and date for provenance and immutable validation.
 ```yaml
 concise: true
 first_person: false
-language_background: Native synthetic-language speaker with strong English; write in clear, direct professional English
+language_background: Native Russian speaker with strong English; write in clear professional English with a natural Russian-influenced rhythm and occasional slightly literal phrasing
 avoid: [corporate jargon, exaggerated claims]
 ```
 

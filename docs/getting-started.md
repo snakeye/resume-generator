@@ -6,11 +6,14 @@
 
 ## 1. Create A Private Repository
 
-Open the public template repository, click **Use this template**, and select
-**Create a new repository**.
+Open the [public template repository](https://github.com/snakeye/resume-generator),
+click **Use this template**, and select **Create a new repository**.
 
 Choose **Private** visibility. Do not use a public fork: generated resumes and
 optionally the professional profile contain personal data.
+
+The [static demo](https://github.com/snakeye/resume-generator-demo) is available
+if you want to preview synthetic output before creating your private repository.
 
 ## 2. Clone It
 
@@ -30,7 +33,7 @@ Install:
 - [uv](https://docs.astral.sh/uv/).
 
 Setup checks GitHub CLI authentication. If authentication is missing, run
-`gh auth login` and rerun setup.
+`gh auth login` and then rerun setup.
 
 ## 4. Run Setup
 
@@ -43,10 +46,14 @@ Setup will:
 - verify that the repository is private;
 - detect the GitHub owner, repository, and default branch;
 - check GitHub authentication;
-- check the local PDF toolchain;
+- verify the required local tools, including the PDF toolchain;
 - request the DeepSeek API key and create `.env`;
 - create the four files under `data/profile/` from the synthetic examples;
 - create the required GitHub labels;
+
+Setup does not generate a resume or run a PDF smoke test. Use `./resume doctor`
+for the same local tool, authentication, repository, profile, and configuration
+diagnostics after setup.
 
 Setup is idempotent. Running it again must not overwrite the profile or
 secrets.

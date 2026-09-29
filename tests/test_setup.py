@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from resume_generator.github import discover_repository
-from resume_generator.setup import SetupError, enable_profile_git, setup_repository
+from resume_generator.github import RepositoryInfo, discover_repository
+from resume_generator.setup import SetupError, diagnose, enable_profile_git, setup_repository
 
 
 def completed(stdout: str = "") -> subprocess.CompletedProcess[str]:
@@ -82,6 +82,21 @@ def test_setup_rejects_public_repository(tmp_path, monkeypatch):
 
     assert not (tmp_path / "data/profile/profile.yaml").exists()
     assert not (tmp_path / ".env").exists()
+
+
+def test_diagnose_reports_insecure_env_permissions(tmp_path, monkeypatch):
+    env = tmp_path / ".env"
+    env.write_text("DEEPSEEK_API_KEY=secret\n", encoding="utf-8")
+    env.chmod(0o644)
+    monkeypatch.setattr("resume_generator.setup.check_local_tools", lambda: [])
+    monkeypatch.setattr(
+        "resume_generator.setup.repository_checks",
+        lambda **_kwargs: RepositoryInfo("example/resume", "main", True),
+    )
+
+    results = diagnose(root=tmp_path, runner=lambda *_args, **_kwargs: completed())
+
+    assert ".env: ERROR: permissions are 644; run chmod 600 .env" in results
 
 
 def test_enable_profile_git_requires_explicit_confirmation(tmp_path):

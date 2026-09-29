@@ -64,8 +64,8 @@ def test_parse_issue_form_rejects_unsupported_version():
         parse_issue_body(body)
 
 
-def test_parse_issue_form_rejects_unsupported_language():
-    body = VALID_BODY.replace("### Resume language\n\nEnglish", "### Resume language\n\nFrench")
+def test_parse_issue_form_rejects_german_language():
+    body = VALID_BODY.replace("### Resume language\n\nEnglish", "### Resume language\n\nGerman")
 
     with pytest.raises(IssueFormError, match="language"):
         parse_issue_body(body)

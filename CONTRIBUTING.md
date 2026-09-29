@@ -4,6 +4,11 @@ The project is being built in small, independently verifiable stages. Start
 with [`docs/index.md`](docs/index.md) and the accepted
 [ADRs](docs/adr/README.md).
 
+Development and debugging happen in the private development repository.
+The public template and static demo are release outputs; do not use them for
+real profile data or as development branches. See the
+[`repository model`](docs/repository-model.md) before preparing a release.
+
 ## Local Checks
 
 ```bash

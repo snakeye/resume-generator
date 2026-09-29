@@ -21,7 +21,8 @@ def test_example_profile_loads_into_normalized_values():
     assert profile.preferences.minimum_experience_bullets == 3
     assert profile.voice.concise is True
     assert profile.voice.language_background == (
-        "Native synthetic-language speaker with strong English; write in clear, direct professional English"
+        "Native Russian speaker with strong English; write in clear professional English with a natural "
+        "Russian-influenced rhythm and occasional slightly literal phrasing"
     )
 
 

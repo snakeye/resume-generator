@@ -17,8 +17,8 @@ with `python-docx` and is an editable convenience format; it is not required to
 match the PDF layout or page count.
 
 All renderers are deterministic and receive only the assembled document. The
-exact publishable allowlist includes `resume.md` and `resume.docx` alongside the
-existing JSON, TeX, PDF, report, and metadata files.
+exact publishable allowlist is `resume.json`, `resume.md`, `resume.tex`,
+`resume.pdf`, `resume.docx`, `report.md`, and `run-metadata.json`.
 
 ## Consequences
 

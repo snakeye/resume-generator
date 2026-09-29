@@ -1,5 +1,10 @@
 # Resume Generator
 
+This is the public template. Create a **private** repository from it before
+adding a real profile or API key. See the
+[synthetic demo](https://github.com/snakeye/resume-generator-demo) for sample
+output.
+
 Generate a resume tailored to a vacancy from a professional profile that you
 control. GitHub Issues are the task queue, a local runner does the private
 work, and every successful request produces a Pull Request for human review.
@@ -43,8 +48,9 @@ GitHub Issue -> local runner -> validated resume -> Pull Request
 6. Create a **Generate resume** issue and wait for the generated Pull Request.
 
 The setup command checks GitHub authentication, creates labels, detects the
-repository and default branch, configures DeepSeek, prepares the profile, and
-checks the local PDF toolchain. Use `./resume doctor` for diagnostics.
+repository and default branch, requests the DeepSeek API key, prepares the
+profile, and checks the local PDF toolchain. If authentication is missing, run
+`gh auth login` and rerun setup. Use `./resume doctor` for diagnostics.
 
 ## Requirements
 
@@ -90,6 +96,7 @@ Git.
 - [Daily use](docs/daily-use.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Architecture and development](docs/index.md)
+- [Repository model](docs/repository-model.md)
 - [Implementation roadmap](docs/roadmap.md)
 
 ## Development

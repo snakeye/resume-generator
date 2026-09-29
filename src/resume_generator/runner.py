@@ -12,10 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from .github import GitHubClient, GitHubError, Issue, RepositoryInfo
+from .github import GitHubClient, GitHubError, Issue, PullRequest, RepositoryInfo
 from .issue import IssueFormError, ResumeTask, format_issue_title, parse_issue_body
 from .pipeline import PipelineResult
 from .profile import ProfileError, load_profile
+from .publishing import PublishingError
 
 Progress = Callable[[str], None]
 
@@ -29,6 +30,8 @@ class Pipeline(Protocol):
 
 
 class Publisher(Protocol):
+    def recover(self, task: ResumeTask, repository: RepositoryInfo, pull_requests: list[PullRequest]) -> None: ...
+
     def prepare(self, task: ResumeTask, repository: RepositoryInfo, *, regenerate: bool = False) -> None: ...
 
     def publish(self, task: ResumeTask, result: PipelineResult, repository: RepositoryInfo) -> object: ...
@@ -73,7 +76,9 @@ def run_once(
 ) -> bool:
     """Reconcile interrupted work and process one ready issue, if available."""
     with process_lock(config.lock_path):
-        repository = _verify_repository(github, config.root, git_runner)
+        repository = github.repository()
+        _recover_working(github, publisher, repository)
+        _verify_repository(github, config.root, git_runner, repository=repository)
         _reconcile_working(github)
         issues = [(issue, False) for issue in github.ready_issues()]
         issues.extend((issue, True) for issue in github.regeneration_issues())
@@ -105,7 +110,9 @@ def run_forced(
 ) -> PipelineResult:
     """Process one explicitly requested issue, regardless of its lifecycle label."""
     with process_lock(config.lock_path):
-        repository = _verify_repository(github, config.root, git_runner)
+        repository = github.repository()
+        _recover_working(github, publisher, repository)
+        _verify_repository(github, config.root, git_runner, repository=repository)
         _reconcile_working(github)
         issue = github.issue(issue_number)
         return process_task(
@@ -220,26 +227,56 @@ def _process_task(
         _fail_issue(github, issue.number, result.error or "Pipeline failed without a reason.")
         return result
 
-    if publisher is not None:
-        if repository is None:
-            raise RunnerError("Repository metadata is required before publishing.")
-        pull_request = publisher.publish(task, result, repository)
-        _report(progress, f"Published pull request #{pull_request.number}")
-        github.set_lifecycle(issue.number, "resume:review")
-        github.comment(issue.number, f"Resume generated successfully.\n\nPull request: #{pull_request.number}")
-        return result
-
-    github.comment(
-        issue.number,
-        "Resume pipeline completed locally. Publishing is not enabled yet; the request remains in working state.",
-    )
-    _report(progress, f"Run completed. Artifacts: {result.output_directory}")
-    return result
+    return _complete_task(issue, task, result, github, publisher, repository, progress)
 
 
 def _report(progress: Progress | None, message: str) -> None:
     if progress is not None:
         progress(message)
+
+
+def _publish_task(
+    issue: Issue,
+    task: ResumeTask,
+    result: PipelineResult,
+    github: GitHubClient,
+    publisher: Publisher,
+    repository: RepositoryInfo,
+    progress: Progress | None,
+) -> object | None:
+    try:
+        pull_request = publisher.publish(task, result, repository)
+        github.set_lifecycle(issue.number, "resume:review")
+        github.comment(issue.number, f"Resume generated successfully.\n\nPull request: #{pull_request.number}")
+    except (GitHubError, PublishingError, OSError) as error:
+        _report(progress, f"Publishing interrupted; task remains recoverable: {error}")
+        return None
+    _report(progress, f"Published pull request #{pull_request.number}")
+    return pull_request
+
+
+def _complete_task(
+    issue: Issue,
+    task: ResumeTask,
+    result: PipelineResult,
+    github: GitHubClient,
+    publisher: Publisher | None,
+    repository: RepositoryInfo | None,
+    progress: Progress | None,
+) -> PipelineResult:
+    if publisher is None:
+        github.comment(
+            issue.number,
+            "Resume pipeline completed locally. Publishing is not enabled yet; the request remains in working state.",
+        )
+        _report(progress, f"Run completed. Artifacts: {result.output_directory}")
+        return result
+    if repository is None:
+        raise RunnerError("Repository metadata is required before publishing.")
+    pull_request = _publish_task(issue, task, result, github, publisher, repository, progress)
+    if pull_request is None:
+        return PipelineResult(success=False, output_directory=result.output_directory, error="Publishing interrupted.")
+    return result
 
 
 def _claim_issue(github: GitHubClient, issue_number: int, regenerate: bool) -> None:
@@ -253,9 +290,11 @@ def _verify_repository(
     github: GitHubClient,
     root: Path,
     git_runner: Callable[..., subprocess.CompletedProcess[str]],
+    *,
+    repository: RepositoryInfo | None = None,
 ) -> RepositoryInfo:
     try:
-        repository = github.repository()
+        repository = repository or github.repository()
         result = git_runner(["git", "status", "--porcelain"], cwd=root, check=False, capture_output=True, text=True)
     except (GitHubError, OSError) as error:
         raise RunnerError(f"Cannot verify repository before polling: {error}") from error
@@ -268,10 +307,29 @@ def _verify_repository(
     return repository
 
 
+def _recover_working(github: GitHubClient, publisher: Publisher | None, repository: RepositoryInfo) -> None:
+    if publisher is None:
+        return
+    for issue in github.working_issues():
+        pull_requests = github.pull_requests_for_branch(f"resume/{issue.number}")
+        try:
+            task = parse_issue_body(
+                issue.body,
+                issue_number=issue.number,
+                issue_created_at=issue.created_at,
+            )
+            publisher.recover(task, repository, pull_requests)
+        except (IssueFormError, PublishingError, OSError) as error:
+            raise RunnerError(f"Cannot recover issue #{issue.number}: {error}") from error
+
+
 def _reconcile_working(github: GitHubClient) -> None:
     for issue in github.working_issues():
         branch = f"resume/{issue.number}"
-        if github.pull_requests_for_branch(branch):
+        pull_requests = github.pull_requests_for_branch(branch)
+        if len(pull_requests) > 1:
+            raise RunnerError(f"Cannot reconcile {branch}: multiple open Pull Requests exist.")
+        if pull_requests:
             github.set_lifecycle(issue.number, "resume:review")
             continue
         github.set_lifecycle(issue.number, "resume:ready")

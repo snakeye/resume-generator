@@ -8,8 +8,8 @@
 - GitHub Issue Form input;
 - local YAML profile;
 - DeepSeek as the working LLM provider;
-- English resume requests;
-- JSON, TeX, PDF, report, and metadata output;
+- English resume requests only;
+- JSON, Markdown, TeX, PDF, DOCX, report, and metadata output;
 - human review through Pull Requests;
 - macOS and Linux, with Windows through WSL;
 - synthetic CI without live LLM calls.

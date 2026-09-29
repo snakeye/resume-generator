@@ -5,7 +5,15 @@ from docx import Document
 from resume_generator.assembly import assemble_resume
 from resume_generator.headline import Headline
 from resume_generator.profile import EarlierExperiencePreferences, load_profile
-from resume_generator.rendering import render_docx, render_latex, render_markdown, render_resume, validate_pdf
+from resume_generator.rendering import (
+    expected_rendered_text,
+    render_docx,
+    render_latex,
+    render_markdown,
+    render_resume,
+    validate_docx,
+    validate_pdf,
+)
 from resume_generator.skills import SkillsSelection
 from resume_generator.voice import VoiceAdaptation
 
@@ -167,6 +175,28 @@ def test_render_docx_contains_resume_text_and_is_editable(tmp_path):
     assert "Completed coursework and a capstone project in distributed systems." in text
 
 
+def test_rendered_text_contract_covers_sections_and_links():
+    resume = make_resume()
+
+    pdf_expected = expected_rendered_text(resume, skills_heading="Skills & Core Competencies")
+    docx_expected = expected_rendered_text(resume, skills_heading="Skills")
+
+    assert "Skills & Core Competencies" in pdf_expected
+    assert "Skills" in docx_expected
+    assert "https://www.linkedin.com/in/alex-example" in pdf_expected
+    assert "Senior Software Engineer" in docx_expected
+    assert "2021-04" in pdf_expected
+    assert "English" in docx_expected
+
+
+def test_docx_validation_reports_missing_expected_content(tmp_path):
+    path = render_docx(make_resume(), tmp_path)
+
+    errors = validate_docx(path, ["Alex Example", "Missing section"])
+
+    assert errors == ("DOCX is missing expected text: Missing section",)
+
+
 def test_pdf_validation_uses_extracted_text_and_reports_missing_values(tmp_path):
     pdf_path = tmp_path / "resume.pdf"
     pdf_path.write_bytes(b"synthetic pdf")
@@ -182,18 +212,8 @@ def test_pdf_validation_ignores_extraction_whitespace_inside_value(tmp_path):
 
     errors = validate_pdf(
         pdf_path,
-        ["Example Labs"],
-        extractor=lambda path: "Example\nLabs",
+        ["InfluencerDB"],
+        extractor=lambda path: "Influencer\nDB",
     )
 
     assert errors == ()
-
-
-def test_pdf_validation_checks_page_count(tmp_path, monkeypatch):
-    pdf_path = tmp_path / "resume.pdf"
-    pdf_path.write_bytes(b"synthetic pdf")
-    monkeypatch.setattr("resume_generator.rendering._page_count", lambda path: 3)
-
-    errors = validate_pdf(pdf_path, [], expected_pages=2, extractor=lambda path: "text")
-
-    assert errors == ("PDF has 3 pages; expected 2.",)

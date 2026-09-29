@@ -1,9 +1,12 @@
 # Documentation
 
-Resume Generator is a template repository for producing evidence-based,
-vacancy-specific resumes through GitHub Issues. Generation runs locally so
-the user's full professional profile does not need to leave their machine or
-enter GitHub Actions.
+Resume Generator is developed in a private repository and released as a
+public GitHub template for producing evidence-based, vacancy-specific resumes
+through GitHub Issues. Generation runs locally so the user's full professional
+profile does not need to leave their machine or enter GitHub Actions.
+
+Read the [repository model](repository-model.md) first to understand the
+boundary between private development, the public template, and the static demo.
 
 ## For Users
 

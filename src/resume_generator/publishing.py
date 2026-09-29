@@ -27,20 +27,24 @@ class GitPublisher:
         self.github = github
         self.runner = runner
         self._existing_pull_request: PullRequest | None = None
+        self._recovered_branch = False
 
     def prepare(self, task: ResumeTask, repository: RepositoryInfo, *, regenerate: bool = False) -> None:
         branch = branch_name(task)
         self._existing_pull_request = None
+        self._recovered_branch = False
         existing = self.github.pull_requests_for_branch(branch)
         if existing and not regenerate:
             raise PublishingError(f"An open Pull Request already exists for {branch}.")
         if regenerate:
-            if len(existing) != 1:
-                raise PublishingError(f"Cannot regenerate {branch}; expected exactly one open Pull Request.")
-            self._existing_pull_request = existing[0]
+            if len(existing) > 1:
+                raise PublishingError(f"Cannot regenerate {branch}; multiple open Pull Requests exist.")
+            self._existing_pull_request = existing[0] if existing else None
+        if self._existing_pull_request is None and _remote_branch_exists(self.runner, self.root, branch):
+            self._recovered_branch = True
         _git(self.runner, self.root, ["switch", repository.default_branch])
         _git(self.runner, self.root, ["pull", "--ff-only"])
-        if regenerate:
+        if regenerate and (self._existing_pull_request is not None or self._recovered_branch):
             _git(self.runner, self.root, ["fetch", "origin", branch])
         _git(self.runner, self.root, ["switch", "-C", branch])
 
@@ -54,10 +58,11 @@ class GitPublisher:
             raise PublishingError(f"Cannot publish; required artifacts are missing: {', '.join(missing)}")
         _git(self.runner, self.root, ["add", "--", *relative_files])
         _git(self.runner, self.root, ["diff", "--cached", "--quiet"], allow_failure=True, expected_codes=(0, 1))
+        _assert_staged_allowlist(self.runner, self.root, relative_files)
         _git(self.runner, self.root, ["commit", "-m", f"Generate resume for issue #{task.issue_number}"])
         branch = branch_name(task)
         push_arguments = ["push", "-u", "origin", branch]
-        if self._existing_pull_request is not None:
+        if self._existing_pull_request is not None or self._recovered_branch:
             push_arguments.insert(1, "--force-with-lease")
         _git(self.runner, self.root, push_arguments)
         try:
@@ -70,6 +75,34 @@ class GitPublisher:
             raise PublishingError(f"Pull Request creation failed: {error}") from error
         finally:
             _git(self.runner, self.root, ["switch", repository.default_branch])
+
+    def recover(
+        self,
+        task: ResumeTask,
+        repository: RepositoryInfo,
+        pull_requests: list[PullRequest],
+    ) -> None:
+        """Discard only interrupted artifacts before startup reconciliation."""
+        if len(pull_requests) > 1:
+            raise PublishingError(f"Cannot recover {branch_name(task)}; multiple open Pull Requests exist.")
+        if pull_requests:
+            return
+
+        relative_files = [
+            str((publishable_output_directory(self.root, task) / name).relative_to(self.root))
+            for name in PUBLISHABLE_FILES
+        ]
+        changed = _changed_paths(self.runner, self.root)
+        unexpected = sorted(changed - set(relative_files))
+        if unexpected:
+            raise PublishingError(
+                "Cannot recover interrupted publishing; unexpected local changes: " + ", ".join(unexpected)
+            )
+        if changed:
+            paths = sorted(changed)
+            _git(self.runner, self.root, ["reset", "--", *paths], allow_failure=True)
+            _git(self.runner, self.root, ["restore", "--", *paths], allow_failure=True)
+            _git(self.runner, self.root, ["clean", "-f", "--", *paths], allow_failure=True)
 
     def restore_default_branch(self, repository: RepositoryInfo) -> None:
         """Return the checkout to the repository default branch after any run."""
@@ -100,6 +133,42 @@ def _git(
         suffix = f": {detail[-1]}" if detail else ""
         raise PublishingError(f"Git command failed: git {' '.join(arguments)}{suffix}")
     return result.stdout
+
+
+def _remote_branch_exists(runner: GitRunner, root: Path, branch: str) -> bool:
+    output = _git(
+        runner,
+        root,
+        ["ls-remote", "--heads", "origin", f"refs/heads/{branch}"],
+        allow_failure=True,
+        expected_codes=(0, 2),
+    )
+    return bool(output.strip())
+
+
+def _assert_staged_allowlist(runner: GitRunner, root: Path, expected: list[str]) -> None:
+    staged = _git(runner, root, ["diff", "--cached", "--name-only"]).splitlines()
+    if set(staged) == set(expected):
+        return
+    unexpected = sorted(set(staged) - set(expected))
+    missing = sorted(set(expected) - set(staged))
+    details = []
+    if unexpected:
+        details.append(f"unexpected staged files: {', '.join(unexpected)}")
+    if missing:
+        details.append(f"missing staged files: {', '.join(missing)}")
+    detail = "; ".join(details)
+    raise PublishingError(f"Cannot publish; Git index is not the artifact allowlist ({detail}).")
+
+
+def _changed_paths(runner: GitRunner, root: Path) -> set[str]:
+    staged = _git(runner, root, ["diff", "--cached", "--name-only"]).splitlines()
+    unstaged = _git(runner, root, ["diff", "--name-only"]).splitlines()
+    return set(staged) | set(unstaged) | set(_untracked_paths(runner, root))
+
+
+def _untracked_paths(runner: GitRunner, root: Path) -> list[str]:
+    return _git(runner, root, ["ls-files", "--others", "--exclude-standard"]).splitlines()
 
 
 def _pull_request_body(task: ResumeTask) -> str:

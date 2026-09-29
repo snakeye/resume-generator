@@ -18,3 +18,13 @@ def test_local_markdown_links_resolve():
                 missing.append(f"{document}: {link}")
 
     assert not missing, "Missing local links:\n" + "\n".join(missing)
+
+
+def test_issue_form_and_scope_match_mvp_contract():
+    issue_form = (Path(".github/ISSUE_TEMPLATE/generate-resume.yml")).read_text()
+    scope = Path("docs/product/scope.md").read_text()
+
+    assert "- English" in issue_form
+    assert "- German" not in issue_form
+    assert "English resume requests only" in scope
+    assert "JSON, Markdown, TeX, PDF, DOCX, report, and metadata output" in scope

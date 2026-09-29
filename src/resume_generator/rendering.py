@@ -99,6 +99,69 @@ def validate_docx(docx_path: Path, expected_text: Sequence[str]) -> tuple[str, .
     return tuple(f"DOCX is missing expected text: {value}" for value in expected_text if value not in text)
 
 
+def expected_rendered_text(resume: ResumeDocument, *, skills_heading: str) -> tuple[str, ...]:
+    """Return content that every rendered resume must preserve."""
+    expected = [
+        resume.basics.name,
+        resume.headline.text,
+        resume.summary.text,
+        "Summary",
+        "Experience",
+        *(value for value in (resume.basics.email, resume.basics.phone, resume.basics.location) if value),
+        *(link.label for link in resume.basics.links),
+        *(link.url for link in resume.basics.links),
+    ]
+    if resume.skills.skills:
+        expected.append(skills_heading)
+        expected.extend(skill.name for skill in resume.skills.skills)
+    expected.extend(_expected_experience_text(resume))
+    if resume.earlier_experience is not None:
+        expected.extend(_expected_earlier_text(resume))
+    if resume.education:
+        expected.extend(_expected_education_text(resume))
+    if resume.languages:
+        expected.extend(_expected_language_text(resume))
+    return tuple(value for value in expected if value)
+
+
+def _expected_experience_text(resume: ResumeDocument) -> list[str]:
+    expected: list[str] = []
+    for company in resume.experience:
+        expected.append(company.company)
+        for role in company.roles:
+            expected.extend((role.position, role.start_date, role.end_date or "Present"))
+            expected.extend(bullet.text for bullet in role.bullets)
+            expected.extend(role.tech_stack)
+    return expected
+
+
+def _expected_earlier_text(resume: ResumeDocument) -> list[str]:
+    block = resume.earlier_experience
+    assert block is not None
+    return [
+        "Earlier Experience",
+        block.position,
+        block.start_date,
+        block.end_date,
+        *(bullet.text for bullet in block.bullets),
+        *block.tech_stack,
+    ]
+
+
+def _expected_education_text(resume: ResumeDocument) -> list[str]:
+    expected = ["Education"]
+    for item in resume.education:
+        expected.extend((item.institution, item.degree_line, *item.details))
+    return expected
+
+
+def _expected_language_text(resume: ResumeDocument) -> list[str]:
+    expected = ["Languages"]
+    for item in resume.languages:
+        expected.extend((item.language, item.level))
+    return expected
+
+
 def _render_markdown(resume: ResumeDocument) -> str:
     lines = [
         f"# {_markdown(resume.basics.name)}",
@@ -367,32 +430,21 @@ def validate_pdf(
     pdf_path: Path,
     expected_text: Sequence[str],
     *,
-    expected_pages: int | None = None,
     extractor: PdfExtractor | None = None,
 ) -> tuple[str, ...]:
     """Extract PDF text and return blocking validation messages."""
     if not pdf_path.exists() or pdf_path.stat().st_size == 0:
         return ("PDF is missing or empty.",)
-    issues: list[str] = []
-    if expected_pages is not None:
-        try:
-            actual_pages = _page_count(pdf_path)
-        except RenderingError as error:
-            issues.append(str(error))
-        else:
-            if actual_pages != expected_pages:
-                issues.append(f"PDF has {actual_pages} pages; expected {expected_pages}.")
     try:
         text = (extractor or extract_pdf_text)(pdf_path)
     except RenderingError as error:
-        return tuple(issues + [str(error)])
+        return (str(error),)
     normalized_text = _normalize_pdf_text(text)
-    issues.extend(
+    return tuple(
         f"PDF is missing expected text: {value}"
         for value in expected_text
         if not _contains_pdf_text(normalized_text, value)
     )
-    return tuple(issues)
 
 
 def extract_pdf_text(pdf_path: Path, *, timeout: float = 30.0) -> str:
@@ -422,22 +474,6 @@ def _contains_pdf_text(text: str, expected: str) -> bool:
     if normalized_expected in text:
         return True
     return re.sub(r"\s+", "", normalized_expected) in re.sub(r"\s+", "", text)
-
-
-def _page_count(pdf_path: Path, *, timeout: float = 30.0) -> int:
-    command = shutil.which("pdfinfo")
-    if command is None:
-        raise RenderingError("pdfinfo is not installed. Install the PDF toolchain and rerun validation.")
-    try:
-        result = subprocess.run([command, str(pdf_path)], capture_output=True, text=True, timeout=timeout, check=False)
-    except subprocess.TimeoutExpired as error:
-        raise RenderingError(f"PDF metadata inspection timed out after {timeout:g} seconds.") from error
-    if result.returncode != 0:
-        raise RenderingError("PDF metadata inspection failed.")
-    for line in result.stdout.splitlines():
-        if line.startswith("Pages:"):
-            return int(line.split(":", 1)[1].strip())
-    raise RenderingError("PDF metadata did not contain a page count.")
 
 
 def _render_experience(resume: ResumeDocument) -> tuple[dict[str, object], ...]:

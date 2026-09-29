@@ -30,6 +30,19 @@ def test_create_run_builds_inspectable_directory(tmp_path):
     datetime.fromisoformat(metadata["created_at"])
 
 
+def test_create_run_preserves_sanitized_reproducibility_metadata(tmp_path):
+    context = create_run(
+        tmp_path,
+        "run-1",
+        metadata={"profile_sha256": "a" * 64, "schema_versions": {"profile": 1}},
+    )
+
+    metadata = json.loads((context.run_dir / "run-metadata.json").read_text(encoding="utf-8"))
+
+    assert metadata["profile_sha256"] == "a" * 64
+    assert metadata["schema_versions"] == {"profile": 1}
+
+
 def test_existing_run_id_is_not_overwritten(tmp_path):
     create_run(tmp_path, "run-1")
 
@@ -177,3 +190,20 @@ def test_pipeline_metadata_records_input_and_completed_stages(tmp_path):
     assert len(metadata["input_sha256"]) == 64
     assert metadata["completed_stages"] == list(PIPELINE_STAGE_NAMES)
     assert "job_description" not in json.dumps(metadata)
+
+
+def test_pipeline_metadata_keeps_reproducibility_fields_after_stage_updates(tmp_path):
+    stages = {name: lambda request, context: {} for name in PIPELINE_STAGE_NAMES}
+
+    result = run_pipeline(
+        ResumeRequest(company="Example", position="Engineer", language="English", job_description="Build systems"),
+        root=tmp_path,
+        run_id="run-1",
+        stages=stages,
+        metadata={"profile_sha256": "b" * 64, "toolchain_versions": {"python": "3.13.0"}},
+    )
+
+    metadata = json.loads((result.output_directory / "run-metadata.json").read_text(encoding="utf-8"))
+
+    assert metadata["profile_sha256"] == "b" * 64
+    assert metadata["toolchain_versions"] == {"python": "3.13.0"}

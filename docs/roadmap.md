@@ -64,6 +64,7 @@ start accurate.
 - factual, coverage, and text validation; **implemented**;
 - LaTeX rendering and PDF compilation; **implemented**;
 - PDF extraction and expected-content checks; **implemented**;
+- Markdown and DOCX rendering and validation; **implemented**;
 - validation never rewrites content; **implemented**;
 - real compiler smoke test remains an optional local check, not a CI requirement.
 
@@ -85,7 +86,10 @@ start accurate.
 
 ## 10. Template Release
 
+- private development repository separated from public release repositories;
+- public template repository created with a clean synthetic export;
+- public static demo repository created with synthetic generated artifacts;
+- public repository links and privacy boundaries documented;
 - clean onboarding test on macOS and Linux;
-- full Git history privacy review;
-- template repository settings;
-- release checklist and `v0.1.0`.
+- full Git history privacy review for the private source and every public export;
+- release acceptance checks and `v0.1.0`.

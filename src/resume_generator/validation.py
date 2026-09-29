@@ -21,6 +21,9 @@ class ValidationIssue(BaseModel):
     code: str = Field(min_length=1)
     message: str = Field(min_length=1)
     path: str | None = None
+    stage: str = "100-validation"
+    claim: str | None = None
+    evidence: tuple[str, ...] = ()
 
 
 class ValidationReport(BaseModel):
@@ -38,6 +41,66 @@ class ValidationReport(BaseModel):
 
 _FACT_PATH_RE = re.compile(r"^work\[(?P<work>\d+)\]\.facts\[(?P<fact>\d+)\]$")
 _NUMBER_RE = re.compile(r"(?<![A-Za-z])\d+(?:[.,]\d+)?%?(?![A-Za-z])")
+_QUANTITY_WORDS = {
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "hundred",
+    "thousand",
+    "million",
+    "billion",
+}
+_ESCALATED_VERBS = {
+    "led",
+    "leads",
+    "managed",
+    "manages",
+    "owned",
+    "owns",
+    "spearheaded",
+    "directed",
+    "oversaw",
+    "architected",
+}
+_ESCALATED_SCOPE = {
+    "enterprise-wide",
+    "organization-wide",
+    "company-wide",
+    "end-to-end",
+    "strategic",
+}
+_SENIORITY_TERMS = {"junior", "mid-level", "senior", "staff", "principal", "director", "vp", "vice president"}
+_TECHNOLOGY_ALIASES = {
+    "aws": "aws",
+    "amazon web services": "aws",
+    "postgres": "postgresql",
+    "postgresql": "postgresql",
+    "kafka": "kafka",
+    "python": "python",
+    "kubernetes": "kubernetes",
+    "docker": "docker",
+    "typescript": "typescript",
+    "java": "java",
+    "go": "go",
+}
 
 
 def validate_resume(
@@ -69,7 +132,37 @@ def _validate_immutable_fields(profile: Profile, resume: ResumeDocument) -> list
         issues.extend(_validate_work_entry(profile, company, role, seen_paths))
     if len(seen_paths) != len(profile.work):
         issues.append(_error("immutable.work_path", "Work provenance does not cover the profile.", "experience"))
+    issues.extend(_validate_education(profile, resume))
+    issues.extend(_validate_languages(profile, resume))
     return issues
+
+
+def _validate_education(profile: Profile, resume: ResumeDocument) -> list[ValidationIssue]:
+    if len(resume.education) != len(profile.education):
+        return [_error("immutable.education_count", "Education count differs from the profile.", "education")]
+    issues: list[ValidationIssue] = []
+    for index, (source, item) in enumerate(zip(profile.education, resume.education, strict=True)):
+        expected = (
+            source.institution,
+            _degree_line(source.area, source.study_type),
+            source.start_date,
+            source.end_date,
+            source.details,
+        )
+        actual = (item.institution, item.degree_line, item.start_date, item.end_date, item.details)
+        if actual != expected:
+            issues.append(_error("immutable.education", "Education differs from the profile.", f"education[{index}]"))
+    return issues
+
+
+def _validate_languages(profile: Profile, resume: ResumeDocument) -> list[ValidationIssue]:
+    if len(resume.languages) != len(profile.languages):
+        return [_error("immutable.language_count", "Language count differs from the profile.", "languages")]
+    return [
+        _error("immutable.language", "Language differs from the profile.", f"languages[{index}]")
+        for index, (source, item) in enumerate(zip(profile.languages, resume.languages, strict=True))
+        if (item.language, item.level) != (source.language, source.level)
+    ]
 
 
 def _validate_work_entry(profile: Profile, company, role, seen_paths: set[str]) -> list[ValidationIssue]:
@@ -104,10 +197,15 @@ def _validate_generated_text(profile: Profile, resume: ResumeDocument) -> list[V
             for index, bullet in enumerate(resume.earlier_experience.bullets)
         )
     for path, text in generated:
-        for number in _NUMBER_RE.findall(text):
+        for number in _quantities(text):
             if number not in allowed_numbers:
                 issues.append(
-                    _error("claim.unsupported_number", f"Number '{number}' is not present in profile facts.", path)
+                    _error(
+                        "claim.unsupported_number",
+                        f"Number '{number}' is not present in profile facts.",
+                        path,
+                        claim=text,
+                    )
                 )
         paths = (
             next(
@@ -124,6 +222,102 @@ def _validate_generated_text(profile: Profile, resume: ResumeDocument) -> list[V
         for fact_path in paths:
             if not _fact_exists(profile, fact_path):
                 issues.append(_error("claim.unknown_fact", f"Unknown provenance path '{fact_path}'.", path))
+        issues.extend(_validate_semantic_scope(profile, path, text, paths))
+        issues.extend(_validate_technologies(profile, path, text))
+    return issues
+
+
+def _validate_semantic_scope(
+    profile: Profile, path: str, text: str, fact_paths: tuple[str, ...]
+) -> list[ValidationIssue]:
+    evidence = tuple(_fact_text(profile, fact_path) for fact_path in fact_paths if _fact_exists(profile, fact_path))
+    source = " ".join((*evidence, *_role_context(profile, fact_paths))).casefold()
+    lowered = text.casefold()
+    issues: list[ValidationIssue] = []
+    for verb in _ESCALATED_VERBS:
+        if re.search(rf"\b{re.escape(verb)}\b", lowered) and not re.search(rf"\b{re.escape(verb)}\b", source):
+            issues.append(
+                _error(
+                    "claim.semantic_drift",
+                    f"Claim uses '{verb}', but the supporting profile evidence does not.",
+                    path,
+                    claim=text,
+                    evidence=evidence,
+                )
+            )
+    for scope in _ESCALATED_SCOPE:
+        if scope in lowered and scope not in source:
+            issues.append(
+                _error(
+                    "claim.semantic_drift",
+                    f"Claim uses '{scope}', but the supporting profile evidence does not.",
+                    path,
+                    claim=text,
+                    evidence=evidence,
+                )
+            )
+    issues.extend(_validate_seniority(path, text, lowered, source, evidence))
+    if (
+        re.search(r"\b(?:i|my)\b", lowered)
+        and re.search(r"\b(?:team|engineers|developers)\b", source)
+        and not re.search(r"\b(?:i|my)\b", source)
+    ):
+        issues.append(
+            _error(
+                "claim.team_attribution",
+                "A team result is presented as an individual claim.",
+                path,
+                claim=text,
+                evidence=evidence,
+            )
+        )
+    return issues
+
+
+def _validate_seniority(
+    path: str, text: str, lowered: str, source: str, evidence: tuple[str, ...]
+) -> list[ValidationIssue]:
+    if path == "headline":
+        return []
+    return [
+        _error(
+            "claim.seniority_drift",
+            f"Claim uses seniority '{term}', but the profile evidence does not.",
+            path,
+            claim=text,
+            evidence=evidence,
+        )
+        for term in _SENIORITY_TERMS
+        if re.search(rf"\b{re.escape(term)}\b", lowered) and not re.search(rf"\b{re.escape(term)}\b", source)
+    ]
+
+
+def _role_context(profile: Profile, fact_paths: tuple[str, ...]) -> tuple[str, ...]:
+    indexes = {int(match["work"]) for path in fact_paths if (match := _FACT_PATH_RE.fullmatch(path)) is not None}
+    return tuple(profile.work[index].position for index in indexes)
+
+
+def _validate_technologies(profile: Profile, path: str, text: str) -> list[ValidationIssue]:
+    profile_skills = (*profile.skills, *(skill for work in profile.work for skill in work.skills))
+    profile_terms = {_TECHNOLOGY_ALIASES.get(skill.casefold(), skill.casefold()) for skill in profile_skills}
+    profile_text = " ".join(fact.text for work in profile.work for fact in work.facts).casefold()
+    profile_terms.update(
+        canonical
+        for term, canonical in _TECHNOLOGY_ALIASES.items()
+        if re.search(rf"\b{re.escape(term)}\b", profile_text)
+    )
+    issues: list[ValidationIssue] = []
+    lowered = text.casefold()
+    for term, canonical in _TECHNOLOGY_ALIASES.items():
+        if re.search(rf"\b{re.escape(term)}\b", lowered) and canonical not in profile_terms:
+            issues.append(
+                _error(
+                    "claim.unsupported_technology",
+                    f"Technology '{term}' is not present in the profile.",
+                    path,
+                    claim=text,
+                )
+            )
     return issues
 
 
@@ -176,7 +370,26 @@ def _validate_coverage(vacancy: VacancyAnalysis, covered: frozenset[str]) -> lis
 
 
 def _profile_numbers(profile: Profile) -> set[str]:
-    return {number for work in profile.work for fact in work.facts for number in _NUMBER_RE.findall(fact.text)}
+    return {number for work in profile.work for fact in work.facts for number in _quantities(fact.text)}
+
+
+def _quantities(text: str) -> set[str]:
+    quantities = set(_NUMBER_RE.findall(text))
+    quantities.update(
+        word for word in re.findall(r"\b[a-z]+(?:-[a-z]+)?\b", text.casefold()) if word in _QUANTITY_WORDS
+    )
+    return quantities
+
+
+def _fact_text(profile: Profile, path: str) -> str:
+    match = _FACT_PATH_RE.fullmatch(path)
+    if match is None:
+        return ""
+    return profile.work[int(match["work"])].facts[int(match["fact"])].text
+
+
+def _degree_line(area: str | None, study_type: str | None) -> str:
+    return " in ".join(value for value in (study_type, area) if value)
 
 
 def _text_paths(resume: ResumeDocument, path: str) -> tuple[str, ...]:
@@ -220,8 +433,15 @@ def _fact_exists(profile: Profile, path: str) -> bool:
     return work_index < len(profile.work) and fact_index < len(profile.work[work_index].facts)
 
 
-def _error(code: str, message: str, path: str) -> ValidationIssue:
-    return ValidationIssue(severity="error", code=code, message=message, path=path)
+def _error(
+    code: str,
+    message: str,
+    path: str,
+    *,
+    claim: str | None = None,
+    evidence: tuple[str, ...] = (),
+) -> ValidationIssue:
+    return ValidationIssue(severity="error", code=code, message=message, path=path, claim=claim, evidence=evidence)
 
 
 def _warning(code: str, message: str, path: str) -> ValidationIssue:

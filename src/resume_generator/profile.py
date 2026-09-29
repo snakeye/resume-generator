@@ -130,7 +130,6 @@ class EarlierExperiencePreferences(ProfileModel):
 
 
 class Preferences(ProfileModel):
-    maximum_pages: int | None = Field(default=None, strict=True, ge=1)
     minimum_experience_bullets: int = Field(default=3, strict=True, ge=1)
     earlier_experience: EarlierExperiencePreferences | None = None
 

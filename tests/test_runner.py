@@ -85,6 +85,10 @@ class FakePublisher:
         self.prepared = []
         self.published = []
         self.restored = []
+        self.recovered = []
+
+    def recover(self, task, repository, pull_requests):
+        self.recovered.append((task, repository, pull_requests))
 
     def prepare(self, task, repository, *, regenerate=False):
         self.prepared.append((task, repository, regenerate))
@@ -258,6 +262,86 @@ def test_working_issue_with_pr_moves_to_review(tmp_path):
     )
 
     assert github.transitions == [(7, "resume:review")]
+
+
+def test_multiple_working_issues_are_reconciled_before_polling(tmp_path):
+    github = FakeGitHub(working=[issue(7), issue(8)])
+
+    assert (
+        run_once(
+            github,
+            FakePipeline(PipelineResult(success=True, output_directory=tmp_path)),
+            RunnerConfig(tmp_path),
+            git_runner=clean_git_runner,
+        )
+        is False
+    )
+
+    assert github.transitions == [(7, "resume:ready"), (8, "resume:ready")]
+
+
+def test_multiple_open_pull_requests_stop_recovery(tmp_path):
+    github = FakeGitHub(working=[issue(7)], prs={"resume/7": [PullRequest(8), PullRequest(9)]})
+
+    with pytest.raises(RunnerError, match="multiple open Pull Requests"):
+        run_once(
+            github,
+            FakePipeline(PipelineResult(success=True, output_directory=tmp_path)),
+            RunnerConfig(tmp_path),
+            git_runner=clean_git_runner,
+        )
+
+    assert github.transitions == []
+
+
+def test_publishing_failure_keeps_issue_recoverable(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner_module, "load_profile", lambda _path: object())
+    github = FakeGitHub(issues=[issue()])
+    publisher = FakePublisher()
+
+    def fail_publish(*_args, **_kwargs):
+        from resume_generator.publishing import PublishingError
+
+        raise PublishingError("push failed")
+
+    publisher.publish = fail_publish
+
+    result = run_once(
+        github,
+        FakePipeline(PipelineResult(success=True, output_directory=tmp_path)),
+        RunnerConfig(tmp_path),
+        publisher=publisher,
+        git_runner=clean_git_runner,
+    )
+
+    assert result is True
+    assert github.transitions == [(42, "resume:working")]
+
+
+def test_github_failure_after_publish_keeps_issue_recoverable(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner_module, "load_profile", lambda _path: object())
+
+    class FailingGitHub(FakeGitHub):
+        def set_lifecycle(self, issue_number, label):
+            if label == "resume:review":
+                from resume_generator.github import GitHubError
+
+                raise GitHubError("GitHub unavailable")
+            super().set_lifecycle(issue_number, label)
+
+    github = FailingGitHub(issues=[issue()])
+    publisher = FakePublisher()
+
+    result = run_once(
+        github,
+        FakePipeline(PipelineResult(success=True, output_directory=tmp_path)),
+        RunnerConfig(tmp_path),
+        publisher=publisher,
+        git_runner=clean_git_runner,
+    )
+
+    assert result is True
+    assert github.transitions == [(42, "resume:working")]
 
 
 def test_dirty_repository_stops_before_claiming_issue(tmp_path):

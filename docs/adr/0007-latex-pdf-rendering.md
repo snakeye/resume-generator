@@ -16,8 +16,10 @@ stored under application resources. Use `xelatex` behind a small callable
 boundary, with configurable main and fallback fonts and a deterministic second
 pass for references.
 
-Publish JSON, TeX, and PDF. Validate compilation, non-empty output, extracted
-text, expected sections, page count, and links before publishing.
+Publish the canonical JSON and its Markdown, TeX, PDF, and DOCX renderings,
+alongside the report and sanitized run metadata. Validate compilation,
+non-empty output, extracted text, expected sections, and links
+before publishing.
 
 ## Consequences
 

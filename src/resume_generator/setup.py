@@ -72,7 +72,6 @@ def check_local_tools() -> list[str]:
         "uv": "uv",
         "xelatex": "PDF toolchain (xelatex)",
         "pdftotext": "PDF text extraction tool (pdftotext)",
-        "pdfinfo": "PDF metadata tool (pdfinfo)",
     }
     return [f"{label} is not installed" for command, label in required.items() if shutil.which(command) is None]
 
@@ -102,6 +101,14 @@ def write_env(paths: Paths, api_key: str) -> bool:
     paths.env.write_text(f"DEEPSEEK_API_KEY={api_key.strip()}\n", encoding="utf-8")
     paths.env.chmod(0o600)
     return True
+
+
+def env_permissions(path: Path) -> int | None:
+    """Return the permission bits for an existing environment file."""
+    try:
+        return path.stat().st_mode & 0o777
+    except FileNotFoundError:
+        return None
 
 
 def repository_checks(
@@ -214,6 +221,9 @@ def diagnose(*, root: Path, runner: Runner) -> list[str]:
     if not paths.env.exists():
         results.append(".env: MISSING; run ./resume setup")
     else:
+        permissions = env_permissions(paths.env)
+        if permissions != 0o600:
+            results.append(f".env: ERROR: permissions are {permissions:03o}; run chmod 600 .env")
         try:
             settings = load_settings(root)
         except RuntimeError as error:

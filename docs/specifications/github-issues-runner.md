@@ -212,11 +212,11 @@ and regenerations keep the same title.
 The supported parser contract is form version `1`. It recognizes the fields
 `Company`, `Position`, `Resume language`, `Job description`, `Additional
 preferences`, and `Form version` in that order. Required fields must contain
-non-empty values, the language must be `English`, and the form
-version must be `1`. Empty additional preferences are normalized to `None`.
+non-empty values, the language must be `English`, and the form version must be
+`1`. Empty additional preferences are normalized to `None`.
 
-The parser preserves validated task fields for diagnostics. Vacancy and
-preference text remain untrusted data: Markdown headings inside those values are not form
+The parser preserves the raw issue body for diagnostics. Vacancy and preference
+text remain untrusted data: Markdown headings inside those values are not form
 fields unless they are recognized form headings in the expected sequence.
 Malformed, duplicated, or out-of-order form fields are rejected before the
 pipeline starts.
@@ -408,7 +408,12 @@ The runner may terminate unexpectedly because of:
 
 Since only one runner exists, startup recovery can remain deliberately simple.
 
-On startup:
+On startup, the runner first reconciles the external task state and any local
+side effects belonging to a `resume:working` issue. It may remove only the
+current task's publishable artifact paths. Unexpected local changes stop
+recovery and remain untouched.
+
+Then it finds all open issues with `resume:working`:
 
 ```text
 find all open issues with resume:working
@@ -416,11 +421,12 @@ find all open issues with resume:working
 
 Normally there must be zero or one.
 
-If one exists, first reconcile external side effects:
+For each issue, reconcile external side effects:
 
 ```text
-open Pull Request exists → resume:review
-no Pull Request exists   → resume:ready
+exactly one open Pull Request exists → resume:review
+no open Pull Request exists          → resume:ready
+multiple open Pull Requests exist    → stop with an ambiguity error
 ```
 
 When returning it to the queue:
@@ -437,8 +443,10 @@ The task has been returned to the queue.
 ```
 
 The next polling iteration processes it again from scratch. A pushed branch
-without a Pull Request may be completed only after its allowlisted artifacts
-have been validated; otherwise it is rebuilt from the current base branch.
+without a Pull Request is treated as an interrupted task branch and is safely
+reused with `git push --force-with-lease` after rebuilding from the current
+base branch. Staged or untracked files are removed only when every changed path
+belongs to the task's publishable artifact allowlist.
 
 The pipeline therefore needs to be idempotent with respect to an issue.
 
@@ -454,7 +462,10 @@ Before every task:
 git status --porcelain
 ```
 
-The runner must refuse to start if the repository contains unexpected local modifications.
+The runner must refuse to claim new work if the repository contains unexpected
+local modifications. During startup recovery it may first remove only the
+allowlisted artifacts of an interrupted working issue; unrelated changes still
+block recovery.
 
 Then:
 
@@ -708,9 +719,13 @@ Vacancy context is informational and never appears as a profile gap.
 
 ## run-metadata.json
 
-Sanitized reproducibility metadata: issue and input hashes, Git commit,
-provider and model, prompt and schema versions, and toolchain versions. It must
-not contain prompts, provider responses, secrets, or profile contents.
+Sanitized reproducibility metadata includes SHA-256 hashes for the parsed issue,
+pipeline input, profile, and provider configuration; Git commit; provider and
+model; hashes for each bundled prompt and the prompt bundle; issue/profile,
+stage-artifact, and request contract versions; and Python/package toolchain
+versions. Hashes use canonical JSON and are never accompanied by the hashed
+source values. It must not contain prompts, provider responses, secrets, or
+profile contents.
 
 ---
 
@@ -764,6 +779,10 @@ git add data/output/<issue-date>/<issue-number>-<company>-<position>/resume.json
 git commit -m "Generate resume for issue #<issue-number>"
 git push -u origin resume/<issue-number>
 ```
+
+Before commit, the runner asserts that the Git index contains exactly the
+publishable artifact allowlist. A staged file outside that allowlist blocks
+publishing.
 
 Then create a Pull Request:
 
@@ -1348,7 +1367,9 @@ network unavailable
 
 Do not casually convert these into a permanent task failure.
 
-The runner should log the infrastructure error and stop or retry conservatively.
+The runner should log the infrastructure error, keep the issue recoverable, and
+retry conservatively on the next runner cycle. It must not convert a transient
+GitHub, Git, or publishing failure into a permanent `resume:failed` state.
 
 The task should remain recoverable.
 
@@ -1372,6 +1393,9 @@ failure reporting
 dirty repository detection
 duplicate PR detection
 regeneration of an existing Pull Request
+recovery after staging, commit, push, and PR creation
+exact publish index allowlist
+recovery with unrelated local changes
 ```
 
 GitHub HTTP calls should be mocked.
